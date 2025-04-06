@@ -37,28 +37,13 @@ print('os.environ["CUDA_VISIBLE_DEVICES"]: ', os.environ["CUDA_VISIBLE_DEVICES"]
 model_llama_BB_instruct = AutoModelForCausalLM.from_pretrained(
     llama_BB_instruct,
     torch_dtype=torch.float16, # 使用 fp16 加速（需要 GPU 支持）
-    #reference_compile=False, 
-    # use_cache=False # 禁用缓存（避免显存不足）
 )
 
-
-# 加载保存的数据集
-# datapath = "/data3/nihat/jupyter/translation/playground/datas/alpaca-uyghur-cleaned"
-# datapath = '/data3/nihat/jupyter/translation/playground/datas/alpaca-uyghur-cleaned_all'
-# datapath = '/data3/nihat/jupyter/translation/playground/datas/alpaca-uyghur-cleaned_all_latin_arabic'
-# datapath = '/data3/nihat/jupyter/translation/playground/datas/alpaca-uyghur-cleaned_all_latin_arabic_zh_en'
-# datapath = '/data3/nihat/jupyter/translation/playground/datas/alpaca-gpt4_deepseek'
-# datapath = '/data3/nihat/jupyter/translation/playground/datas/alpaca-gpt4_deepseek_arabic_latin_all'
 datapath = '/data3/nihat/jupyter/translation/playground/datas/alpaca-gpt4_alapca_con'
 
 train_data = load_from_disk(datapath)
 # 打乱数据集
 train_data = train_data.shuffle(seed=42)  # 设置随机种子确保可重复性
-# dataset = load_dataset("saillab/alpaca-uyghur-cleaned")
-# train_data = dataset['train']
-# eval_data = dataset['test']
-# train_data = train_data.select(range(2000))
-# eval_data = train_data.select(range(2000))
 print('finish loading data')
 print('length of train_data: ', len(train_data))
 
@@ -91,7 +76,6 @@ config = LoraConfig(
 
 
 tokenizer_llama_BB_instruct.pad_token = tokenizer_llama_BB_instruct.eos_token
-# model_llama_BB_instruct.enable_input_require_grads() # 开启梯度检查点时，要执行该方法
 model = get_peft_model(model_llama_BB_instruct, config)
 
 
@@ -115,14 +99,8 @@ args = TrainingArguments(
     weight_decay=0.01,  # 添加权重衰减防止过拟合
     warmup_ratio=0.1,   # 添加 warmup，让学习率先慢后快
     lr_scheduler_type="cosine",  # 使用 cosine 学习率调度器
-    # evaluation_strategy="steps",  # 定期进行评估
-    # eval_steps=500,     # 每500步评估一次
     seed=42,           # 设置随机种子
-    # dataloader_num_workers=4,  # 增加数据加载的线程数
-    # deepspeed="/data3/nihat/jupyter/translation/playground/ds_z3_config.json",
     deepspeed = '/data3/nihat/jupyter/translation/nllb/ds_z2_config.json',
-    # deepspeed = '/data3/nihat/jupyter/translation/playground/ds_z2_config.json'
-    # deepspeed = '/data3/nihat/jupyter/translation/playground/ds_z2_config_easy.json'
 )
 
 # model = model.to(device)
@@ -130,60 +108,12 @@ trainer = Trainer(
     model=model,
     args=args,
     train_dataset = train_data_tokenized_id,
-    # eval_dataset = eval_data_tokenized_id,
     data_collator=data_collator
 )   
 
 trainer.train()
-# trainer.train(resume_from_checkpoint=True, no_sync=False)
 trainer.save_model(save_last_path)
 print('output_dir: ', save_last_path)
 print('Train Done')
 
-
-
-
-# 推理
-# lora_path = '/data3/nihat/jupyter/translation/playground/finetuned_models/llama_BB_instruct_2024-12_08_16:28_ug_chat/checkpoint-750'
-# # 加载lora权重
-# llama_BB_instruct = '/data3/nihat/jupyter/translation/playground/base_model/llama_3.1_8B_instruct'
-# model_llama_BB_instruct = AutoModelForCausalLM.from_pretrained(
-#     llama_BB_instruct,
-#     torch_dtype=torch.float16, # 使用 fp16 加速（需要 GPU 支持）
-#     #reference_compile=False, 
-#     # use_cache=False # 禁用缓存（避免显存不足）
-# )
-# model = PeftModel.from_pretrained(model_llama_BB_instruct, model_id=lora_path)
-
-
-# prompt = "你叫什么名字"
-# prompt = '讨厌！'
-# prompt = '启禀小主，皇后身边的剪秋姑姑给您送东西来了，请您三日后卯时到景仁宫觐见。'
-# prompt = '你喜欢皇上吗'
-# prompt = '马斯克是谁'
-# prompt = 'how is the weather today'
-# prompt = 'who are u'
-# prompt = '哪个AI模型最好'
-# prompt = 'yahshim siz' 
-# prompt = "ۋاقىت ئالدىراڭغۇ   تۇرمايدۇ"
-# prompt = "ئەملايىمىزنى تەكشۈرۈپ بېرىڭ"
-# prompt =  '«ئۇ باغچىدا كېتىۋاتاتتى» دېگەن جۈملىنى تېخىمۇ قىزىقارلىق ئىبارىلەرگە يېزىڭ',
-# prompt = ' ئۇ باغچىدا ساياھەت قىلىۋاتاتتى.'
-# prompt = 'كۈچەيتىش ئۆگىنىشى ئۈچۈن تىپىك ئىشلىتىش قېپىنى تەسۋىرلەڭ'
-# prompt = 'ياخشىمسىز'
-
-# messages = [
-#         {"role": "system", "content": "Speak in one of the languages: Uyghur, Chinese, or English, and respond based on the user's language choice."},
-#         {"role": "user", "content": prompt}
-# ]
-
-# input_ids = tokenizer_llama_BB_instruct.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-# model_inputs = tokenizer_llama_BB_instruct([input_ids], return_tensors="pt").to('cuda')
-# generated_ids = model.generate(model_inputs.input_ids,max_new_tokens=512)
-# generated_ids = [
-#     output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
-# ]
-
-# response = tokenizer_llama_BB_instruct.batch_decode(generated_ids, skip_special_tokens=True)[0]
-# print(response)
 
